@@ -13,11 +13,11 @@ categories = ["game-development"]
 readme = "../README.md"
 
 [dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy", default-features = false }
+bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-features = false }
 bevy_asset_loader_derive = { version = "=0.2.0", path = "../bevy_asset_loader_derive" }
 
 [dev-dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy", features = ["vorbis"] }
+bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["vorbis"] }
 
 [[example]]
 name = "two_collections"
