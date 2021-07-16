@@ -86,12 +86,15 @@ pub trait AssetCollection: Component {
     fn load(asset_server: &Res<AssetServer>) -> Vec<HandleUntyped>;
 }
 
-struct LoadingAssetHandles<A: Component> {
-    handles: Vec<HandleId>,
+/// TODO: only made thse pub for debugging
+pub struct LoadingAssetHandles<A: Component> {
+    /// TODO: only made thse pub for debugging
+    pub handles: Vec<HandleId>,
     marker: PhantomData<A>,
 }
 
-struct AssetLoaderConfiguration<T> {
+/// TODO: only made thse pub for debugging
+pub struct AssetLoaderConfiguration<T> {
     next: T,
     count: usize,
 }
