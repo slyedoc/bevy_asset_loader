@@ -1,9 +1,9 @@
 [package]
 name = "bevy_asset_loader"
-version = "0.2.0"
+version = "0.6.0"
 authors = ["Niklas Eicker <git@nikl.me>"]
 edition = "2018"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = "Bevy plugin for asset loading"
 repository = "https://github.com/NiklasEi/bevy_asset_loader"
 homepage = "https://github.com/NiklasEi/bevy_asset_loader"
@@ -12,13 +12,37 @@ keywords = ["bevy", "gamedev", "asset", "assets"]
 categories = ["game-development"]
 readme = "../README.md"
 
+[features]
+default = ["render", "sprite"]
+render = ["bevy_asset_loader_derive/render"]
+sprite = ["bevy_asset_loader_derive/sprite"]
+
 [dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-features = false }
-bevy_asset_loader_derive = { version = "=0.2.0", path = "../bevy_asset_loader_derive" }
+bevy = "0.5"
+bevy_asset_loader_derive = { version = "=0.6.0", path = "../bevy_asset_loader_derive" }
 
 [dev-dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["vorbis"] }
+bevy = { version = "0.5" }
+trybuild = "1.0"
 
 [[example]]
 name = "two_collections"
 path = "examples/two_collections.rs"
+
+[[example]]
+name = "atlas_from_grid"
+path = "examples/atlas_from_grid.rs"
+required-features = ["render"]
+
+[[example]]
+name = "init_resource"
+path = "examples/init_resource.rs"
+
+[[example]]
+name = "color_material"
+path = "examples/color_material.rs"
+required-features = ["sprite"]
+
+[patch.crates.io]
+bevy = { git = "https://github.com/bevyengine/bevy", branch="main" }
+#bevy = {git = "https://github.com/bevyengine/bevy", rev = "f6b42b86691bdea92613df3e1e754dbc9455dbc2", features = ["vorbis"] }

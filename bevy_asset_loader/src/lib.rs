@@ -1,19 +1,27 @@
-//! The goal of this crate is to offer an easy way for bevy games to load all their assets.
+//! The goal of this crate is to offer an easy way for bevy games to load all their assets in a loading [bevy_ecs::schedule::State].
+//!
+//! `bevy_asset_loader` introduces the derivable trait [AssetCollection]. Structs with asset handles
+//! can be automatically loaded during a configurable loading [bevy_ecs::schedule::State]. Afterwards they will be inserted as
+//! resources containing loaded handles and the plugin will switch to a second configurable [bevy_ecs::schedule::State].
 //!
 //! ```edition2018
 //! # use bevy_asset_loader::{AssetLoader, AssetCollection};
 //! # use bevy::prelude::*;
 //! # use bevy::asset::AssetPlugin;
 //! fn main() {
-//! let mut app = App::build();
+//!     let mut app = App::new();
 //!     AssetLoader::new(GameState::Loading, GameState::Next)
 //!         .with_collection::<AudioAssets>()
 //!         .with_collection::<TextureAssets>()
 //!         .build(&mut app);
 //!     app
 //!         .add_state(GameState::Loading)
-//!         //.add_plugins(DefaultPlugins)
-//!         .add_system_set(SystemSet::on_update(GameState::Next).with_system(use_asset_handles.system()))
+//! # /*
+//!         .add_plugins(DefaultPlugins)
+//! # */
+//!         .add_system_set(SystemSet::on_update(GameState::Next)
+//!             .with_system(use_asset_handles.system())
+//!         )
 //!         # .add_plugins(MinimalPlugins)
 //!         # .add_plugin(AssetPlugin::default())
 //!         # .set_runner(|mut app| app.schedule.run(&mut app.world))
@@ -22,10 +30,10 @@
 //!
 //! #[derive(AssetCollection)]
 //! struct AudioAssets {
-//!     #[asset(path = "walking.ogg")]
-//!     walking: Handle<AudioSource>,
-//!     #[asset(path = "flying.ogg")]
-//!     flying: Handle<AudioSource>
+//!     #[asset(path = "audio/background.ogg")]
+//!     background: Handle<AudioSource>,
+//!     #[asset(path = "audio/plop.ogg")]
+//!     plop: Handle<AudioSource>
 //! }
 //!
 //! #[derive(AssetCollection)]
@@ -36,10 +44,10 @@
 //!     pub tree: Handle<Texture>,
 //! }
 //!
-//! // since this function runs in [MyState::Next], we know our assets are
-//! // loaded and [MyAudioAssets] is a resource
+//! // since this function runs in MyState::Next, we know our assets are
+//! // loaded and their handles are in the resource AudioAssets
 //! fn use_asset_handles(audio_assets: Res<AudioAssets>, audio: Res<Audio>) {
-//!     audio.play(audio_assets.flying.clone());
+//!     audio.play(audio_assets.background.clone());
 //! }
 //!
 //! #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -54,12 +62,13 @@
 
 pub use bevy_asset_loader_derive::AssetCollection;
 
-use bevy::app::AppBuilder;
-use bevy::asset::{AssetServer, HandleId, HandleUntyped, LoadState};
+use bevy::app::App;
+use bevy::asset::{AssetServer, HandleUntyped, LoadState};
 use bevy::ecs::component::Component;
+use bevy::ecs::prelude::IntoExclusiveSystem;
 use bevy::ecs::schedule::State;
-use bevy::ecs::system::IntoSystem;
-use bevy::prelude::{Commands, Res, ResMut, SystemSet};
+use bevy::prelude::{FromWorld, SystemSet, World};
+use bevy::utils::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -80,55 +89,113 @@ use std::marker::PhantomData;
 /// }
 /// ```
 pub trait AssetCollection: Component {
-    /// Create a new AssetCollection from the [bevy::asset::AssetServer]
-    fn create(asset_server: &Res<AssetServer>) -> Self;
+    /// Create a new AssetCollection from the [bevy_asset::AssetServer]
+    fn create(world: &mut World) -> Self;
     /// Start loading all the assets in the collection
-    fn load(asset_server: &Res<AssetServer>) -> Vec<HandleUntyped>;
+    fn load(world: &mut World) -> Vec<HandleUntyped>;
 }
 
-/// TODO: only made thse pub for debugging
-pub struct LoadingAssetHandles<A: Component> {
-    /// TODO: only made thse pub for debugging
-    pub handles: Vec<HandleId>,
+struct LoadingAssetHandles<A: Component> {
+    handles: Vec<HandleUntyped>,
     marker: PhantomData<A>,
 }
 
-/// TODO: only made thse pub for debugging
-pub struct AssetLoaderConfiguration<T> {
+struct AssetLoaderConfiguration<T> {
+    configuration: HashMap<T, LoadingConfiguration<T>>,
+}
+
+impl<T> Default for AssetLoaderConfiguration<T> {
+    fn default() -> Self {
+        AssetLoaderConfiguration {
+            configuration: HashMap::default(),
+        }
+    }
+}
+
+struct LoadingConfiguration<T> {
     next: T,
     count: usize,
 }
 
-fn start_loading<Assets: AssetCollection>(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let mut handles = Assets::load(&asset_server);
-    commands.insert_resource(LoadingAssetHandles {
-        handles: handles.drain(..).map(|handle| handle.id).collect(),
+fn start_loading<T: Component + Debug + Clone + Eq + Hash, Assets: AssetCollection>(
+    world: &mut World,
+) {
+    {
+        let cell = world.cell();
+        let mut asset_loader_configuration = cell
+            .get_resource_mut::<AssetLoaderConfiguration<T>>()
+            .expect("Cannot get AssetLoaderConfiguration");
+        let state = cell.get_resource::<State<T>>().expect("Cannot get state");
+        let mut config = asset_loader_configuration
+            .configuration
+            .get_mut(state.current())
+            .unwrap_or_else(|| {
+                panic!(
+                    "Could not find a loading configuration for state {:?}",
+                    state.current()
+                )
+            });
+        config.count += 1;
+    }
+    let handles = LoadingAssetHandles {
+        handles: Assets::load(world),
         marker: PhantomData::<Assets>,
-    })
+    };
+    world.insert_resource(handles);
 }
 
 fn check_loading_state<T: Component + Debug + Clone + Eq + Hash, Assets: AssetCollection>(
-    mut commands: Commands,
-    mut state: ResMut<State<T>>,
-    mut config: ResMut<AssetLoaderConfiguration<T>>,
-    asset_server: Res<AssetServer>,
-    loading_asset_handles: Option<Res<LoadingAssetHandles<Assets>>>,
+    world: &mut World,
 ) {
-    if let Some(loading_asset_handles) = loading_asset_handles {
-        let load_state = asset_server.get_group_load_state(loading_asset_handles.handles.clone());
-        if load_state == LoadState::Loaded {
-            commands.insert_resource(Assets::create(&asset_server));
-            commands.remove_resource::<LoadingAssetHandles<Assets>>();
-            if config.count == 1 {
-                commands.remove_resource::<AssetLoaderConfiguration<T>>();
+    {
+        let cell = world.cell();
+
+        let loading_asset_handles = cell.get_resource::<LoadingAssetHandles<Assets>>();
+        if loading_asset_handles.is_none() {
+            return;
+        }
+        let loading_asset_handles = loading_asset_handles.unwrap();
+
+        let asset_server = cell
+            .get_resource::<AssetServer>()
+            .expect("Cannot get AssetServer resource");
+        let load_state = asset_server
+            .get_group_load_state(loading_asset_handles.handles.iter().map(|handle| handle.id));
+        if load_state != LoadState::Loaded {
+            return;
+        }
+
+        // Todo: fire events `AssetCollection-` Ready/Loaded/Inserted?
+        // First event when all handles are done
+        // => system checks for events, reduces config count/changes state
+        // => fires event that collection is now inserted
+        // Export labels to sort check_loading_state / insert systems
+        let mut state = cell
+            .get_resource_mut::<State<T>>()
+            .expect("Cannot get State resource");
+        let mut asset_loader_configuration = cell
+            .get_resource_mut::<AssetLoaderConfiguration<T>>()
+            .expect("Cannot get AssetLoaderConfiguration resource");
+        if let Some(mut config) = asset_loader_configuration
+            .configuration
+            .get_mut(state.current())
+        {
+            config.count -= 1;
+            if config.count == 0 {
                 state
                     .set(config.next.clone())
                     .expect("Failed to set next State");
-            } else {
-                config.count -= 1;
             }
         }
     }
+    let asset_collection = Assets::create(world);
+    world.insert_resource(asset_collection);
+    world.remove_resource::<LoadingAssetHandles<Assets>>();
+}
+
+fn init_resource<Asset: FromWorld + Component>(world: &mut World) {
+    let asset = Asset::from_world(world);
+    world.insert_resource(asset);
 }
 
 /// A Bevy plugin to configure automatic asset loading
@@ -138,7 +205,7 @@ fn check_loading_state<T: Component + Debug + Clone + Eq + Hash, Assets: AssetCo
 /// # use bevy::prelude::*;
 /// # use bevy::asset::AssetPlugin;
 /// fn main() {
-/// let mut app = App::build();
+///     let mut app = App::new();
 ///     AssetLoader::new(GameState::Loading, GameState::Menu)
 ///         .with_collection::<AudioAssets>()
 ///         .with_collection::<TextureAssets>()
@@ -155,7 +222,7 @@ fn check_loading_state<T: Component + Debug + Clone + Eq + Hash, Assets: AssetCo
 /// }
 ///
 /// fn play_audio(audio_assets: Res<AudioAssets>, audio: Res<Audio>) {
-///     audio.play(audio_assets.flying.clone());
+///     audio.play(audio_assets.background.clone());
 /// }
 ///
 /// #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -166,8 +233,8 @@ fn check_loading_state<T: Component + Debug + Clone + Eq + Hash, Assets: AssetCo
 ///
 /// #[derive(AssetCollection)]
 /// pub struct AudioAssets {
-///     #[asset(path = "audio/flying.ogg")]
-///     pub flying: Handle<AudioSource>,
+///     #[asset(path = "audio/background.ogg")]
+///     pub background: Handle<AudioSource>,
 /// }
 ///
 /// #[derive(AssetCollection)]
@@ -179,26 +246,28 @@ fn check_loading_state<T: Component + Debug + Clone + Eq + Hash, Assets: AssetCo
 /// }
 /// ```
 pub struct AssetLoader<T> {
-    next: T,
+    next_state: T,
+    loading_state: T,
     load: SystemSet,
     check: SystemSet,
+    post_process: SystemSet,
     collection_count: usize,
 }
 
-impl<T> AssetLoader<T>
+impl<State> AssetLoader<State>
 where
-    T: Component + Debug + Clone + Eq + Hash,
+    State: Component + Debug + Clone + Eq + Hash,
 {
     /// Create a new [AssetLoader]
     ///
-    /// This function takes two States. During the first all assets will be loaded and the
-    /// collections will be inserted as resources. Then the second state is set in your Bevy App.
+    /// This function takes two [bevy_ecs::schedule::State]s. During the first one, all assets will be loaded and the
+    /// collections will be inserted as resources. Then your app is moved into the second [bevy_ecs::schedule::State].
     /// ```edition2018
     /// # use bevy_asset_loader::{AssetLoader, AssetCollection};
     /// # use bevy::prelude::*;
     /// # use bevy::asset::AssetPlugin;
     /// # fn main() {
-    ///     let mut app = App::build();
+    ///     let mut app = App::new();
     ///     AssetLoader::new(GameState::Loading, GameState::Menu)
     ///         .with_collection::<AudioAssets>()
     ///         .with_collection::<TextureAssets>()
@@ -217,8 +286,8 @@ where
     /// # }
     /// # #[derive(AssetCollection)]
     /// # pub struct AudioAssets {
-    /// #     #[asset(path = "audio/flying.ogg")]
-    /// #     pub flying: Handle<AudioSource>,
+    /// #     #[asset(path = "audio/background.ogg")]
+    /// #     pub background: Handle<AudioSource>,
     /// # }
     /// # #[derive(AssetCollection)]
     /// # pub struct TextureAssets {
@@ -228,24 +297,26 @@ where
     /// #     pub tree: Handle<Texture>,
     /// # }
     /// ```
-    pub fn new(load: T, next: T) -> AssetLoader<T> {
+    pub fn new(load: State, next: State) -> AssetLoader<State> {
         Self {
-            next,
+            next_state: next,
+            loading_state: load.clone(),
             load: SystemSet::on_enter(load.clone()),
-            check: SystemSet::on_update(load),
+            check: SystemSet::on_update(load.clone()),
+            post_process: SystemSet::on_exit(load),
             collection_count: 0,
         }
     }
 
     /// Add an [AssetCollection] to the [AssetLoader]
     ///
-    /// The added collection will be loaded and inserted into your Bevy App as a resource.
+    /// The added collection will be loaded and inserted into your Bevy app as a resource.
     /// ```edition2018
     /// # use bevy_asset_loader::{AssetLoader, AssetCollection};
     /// # use bevy::prelude::*;
     /// # use bevy::asset::AssetPlugin;
     /// # fn main() {
-    ///     let mut app = App::build();
+    ///     let mut app = App::new();
     ///     AssetLoader::new(GameState::Loading, GameState::Menu)
     ///         .with_collection::<AudioAssets>()
     ///         .with_collection::<TextureAssets>()
@@ -264,8 +335,8 @@ where
     /// # }
     /// # #[derive(AssetCollection)]
     /// # pub struct AudioAssets {
-    /// #     #[asset(path = "audio/flying.ogg")]
-    /// #     pub flying: Handle<AudioSource>,
+    /// #     #[asset(path = "audio/background.ogg")]
+    /// #     pub background: Handle<AudioSource>,
     /// # }
     /// # #[derive(AssetCollection)]
     /// # pub struct TextureAssets {
@@ -276,9 +347,63 @@ where
     /// # }
     /// ```
     pub fn with_collection<A: AssetCollection>(mut self) -> Self {
-        self.load = self.load.with_system(start_loading::<A>.system());
-        self.check = self.check.with_system(check_loading_state::<T, A>.system());
+        self.load = self
+            .load
+            .with_system(start_loading::<State, A>.exclusive_system());
+        self.check = self
+            .check
+            .with_system(check_loading_state::<State, A>.exclusive_system());
         self.collection_count += 1;
+
+        self
+    }
+
+    /// Add any [bevy_ecs::world::FromWorld] resource to be initialized after all asset collections are loaded.
+    /// ```edition2018
+    /// # use bevy_asset_loader::{AssetLoader, AssetCollection};
+    /// # use bevy::prelude::*;
+    /// # use bevy::asset::AssetPlugin;
+    /// # fn main() {
+    ///     let mut app = App::new();
+    ///     AssetLoader::new(GameState::Loading, GameState::Menu)
+    ///         .with_collection::<TextureForAtlas>()
+    ///         .init_resource::<TextureAtlasFromWorld>()
+    ///         .build(&mut app);
+    /// #   app
+    /// #       .add_state(GameState::Loading)
+    /// #       .add_plugins(MinimalPlugins)
+    /// #       .add_plugin(AssetPlugin::default())
+    /// #       .set_runner(|mut app| app.schedule.run(&mut app.world))
+    /// #       .run();
+    /// # }
+    /// # #[derive(Clone, Eq, PartialEq, Debug, Hash)]
+    /// # enum GameState {
+    /// #     Loading,
+    /// #     Menu
+    /// # }
+    /// # struct TextureAtlasFromWorld {
+    /// #     atlas: Handle<TextureAtlas>
+    /// # }
+    /// # impl FromWorld for TextureAtlasFromWorld {
+    /// #     fn from_world(world: &mut World) -> Self {
+    /// #         let cell = world.cell();
+    /// #         let assets = cell.get_resource::<TextureForAtlas>().expect("TextureForAtlas not loaded");
+    /// #         let mut atlases = cell.get_resource_mut::<Assets<TextureAtlas>>().expect("TextureAtlases missing");
+    /// #         TextureAtlasFromWorld {
+    /// #             atlas: atlases.add(TextureAtlas::from_grid(assets.array.clone(), Vec2::new(250., 250.), 1, 4))
+    /// #         }
+    /// #     }
+    /// # }
+    /// # #[derive(AssetCollection)]
+    /// # pub struct TextureForAtlas {
+    /// #     #[asset(path = "textures/female_adventurer.ogg")]
+    /// #     pub array: Handle<Texture>,
+    /// # }
+    /// ```
+    pub fn init_resource<A: FromWorld + Component>(mut self) -> Self {
+        self.post_process = self
+            .post_process
+            .with_system(init_resource::<A>.exclusive_system());
 
         self
     }
@@ -291,7 +416,7 @@ where
     /// # use bevy::prelude::*;
     /// # use bevy::asset::AssetPlugin;
     /// # fn main() {
-    ///     let mut app = App::build();
+    ///     let mut app = App::new();
     ///     AssetLoader::new(GameState::Loading, GameState::Menu)
     ///         .with_collection::<AudioAssets>()
     ///         .with_collection::<TextureAssets>()
@@ -310,8 +435,8 @@ where
     /// # }
     /// # #[derive(AssetCollection)]
     /// # pub struct AudioAssets {
-    /// #     #[asset(path = "audio/flying.ogg")]
-    /// #     pub flying: Handle<AudioSource>,
+    /// #     #[asset(path = "audio/background.ogg")]
+    /// #     pub background: Handle<AudioSource>,
     /// # }
     /// # #[derive(AssetCollection)]
     /// # pub struct TextureAssets {
@@ -321,12 +446,27 @@ where
     /// #     pub tree: Handle<Texture>,
     /// # }
     /// ```
-    pub fn build(self, app: &mut AppBuilder) {
+    pub fn build(self, app: &mut App) {
+        let asset_loader_configuration = app
+            .world
+            .get_resource_mut::<AssetLoaderConfiguration<State>>();
+        let config = LoadingConfiguration {
+            next: self.next_state.clone(),
+            count: 0,
+        };
+        if let Some(mut asset_loader_configuration) = asset_loader_configuration {
+            asset_loader_configuration
+                .configuration
+                .insert(self.loading_state.clone(), config);
+        } else {
+            let mut asset_loader_configuration = AssetLoaderConfiguration::default();
+            asset_loader_configuration
+                .configuration
+                .insert(self.loading_state.clone(), config);
+            app.world.insert_resource(asset_loader_configuration);
+        }
         app.add_system_set(self.load)
             .add_system_set(self.check)
-            .insert_resource(AssetLoaderConfiguration::<T> {
-                count: self.collection_count,
-                next: self.next,
-            });
+            .add_system_set(self.post_process);
     }
 }

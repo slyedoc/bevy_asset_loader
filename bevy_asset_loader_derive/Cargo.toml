@@ -1,9 +1,9 @@
 [package]
 name = "bevy_asset_loader_derive"
-version = "0.2.0"
+version = "0.6.0"
 authors = ["Niklas Eicker <git@nikl.me>"]
 edition = "2018"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = "Macro implementation for #[derive(AssetCollection)]"
 repository = "https://github.com/NiklasEi/bevy_asset_loader"
 homepage = "https://github.com/NiklasEi/bevy_asset_loader"
@@ -11,6 +11,10 @@ documentation = "https://docs.rs/bevy_asset_loader_derive"
 keywords = ["bevy", "gamedev", "asset", "assets"]
 categories = ["game-development"]
 readme = "../README.md"
+
+[features]
+render = []
+sprite = []
 
 [lib]
 proc-macro = true
