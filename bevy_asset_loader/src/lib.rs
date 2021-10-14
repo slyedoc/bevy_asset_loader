@@ -62,12 +62,11 @@
 
 pub use bevy_asset_loader_derive::AssetCollection;
 
-use bevy::app::App;
 use bevy::asset::{AssetServer, HandleUntyped, LoadState};
 use bevy::ecs::component::Component;
 use bevy::ecs::prelude::IntoExclusiveSystem;
 use bevy::ecs::schedule::State;
-use bevy::prelude::{FromWorld, SystemSet, World};
+use bevy::prelude::*;
 use bevy::utils::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -446,6 +445,10 @@ where
     /// #     pub tree: Handle<Texture>,
     /// # }
     /// ```
+    /// 
+
+
+
     pub fn build(self, app: &mut App) {
         let asset_loader_configuration = app
             .world

@@ -22,7 +22,6 @@ bevy = "0.5"
 bevy_asset_loader_derive = { version = "=0.6.0", path = "../bevy_asset_loader_derive" }
 
 [dev-dependencies]
-bevy = { version = "0.5" }
 trybuild = "1.0"
 
 [[example]]
@@ -43,6 +42,9 @@ name = "color_material"
 path = "examples/color_material.rs"
 required-features = ["sprite"]
 
-[patch.crates.io]
-bevy = { git = "https://github.com/bevyengine/bevy", branch="main" }
+[patch.crates-io]
+bevy = { git = "https://github.com/bevyengine/bevy", branch = "main" }
 #bevy = {git = "https://github.com/bevyengine/bevy", rev = "f6b42b86691bdea92613df3e1e754dbc9455dbc2", features = ["vorbis"] }
+
+[patch."https://github.com/bevyengine/bevy"]
+bevy_dolly = { path = "../bevy" }
