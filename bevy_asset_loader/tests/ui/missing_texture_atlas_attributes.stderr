@@ -1,0 +1,7 @@
+error: Field is missing asset attributes: texture_atlas/tile_size_x, texture_atlas/tile_size_y, texture_atlas/rows
+  --> $DIR/missing_texture_atlas_attributes.rs:8:5
+   |
+8  | /     #[asset(texture_atlas(columns = 2))]
+9  | |     #[asset(path = "test.png")]
+10 | |     test: Handle<TextureAtlas>
+   | |______________________________^

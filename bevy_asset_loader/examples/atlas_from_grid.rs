@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 use bevy_asset_loader::{AssetCollection, AssetLoader};
 
+/// This example demonstrates how to load a texture atlas from a sprite sheet
+///
+/// Requires the feature 'render' (part of default features)
 fn main() {
-    let mut app = App::build();
+    let mut app = App::new();
     AssetLoader::new(MyStates::AssetLoading, MyStates::Next)
-        .with_collection::<SpriteSheet>()
-        .init_resource::<MyTextureAtlas>()
+        .with_collection::<MyAssets>()
         .build(&mut app);
     app.add_state(MyStates::AssetLoading)
         .add_plugins(DefaultPlugins)
@@ -16,48 +18,27 @@ fn main() {
         .run();
 }
 
-#[allow(dead_code)]
 #[derive(AssetCollection)]
-struct SpriteSheet {
+struct MyAssets {
+    // if the sheet would have padding, we could set that with `padding_x` and `padding_y`
+    #[asset(texture_atlas(tile_size_x = 100., tile_size_y = 96., columns = 8, rows = 1))]
     #[asset(path = "textures/female_adventurer.png")]
-    female_adventurer: Handle<Texture>,
-}
-
-#[allow(dead_code)]
-struct MyTextureAtlas {
-    atlas: Handle<TextureAtlas>,
-}
-
-impl FromWorld for MyTextureAtlas {
-    fn from_world(world: &mut World) -> Self {
-        let cell = world.cell();
-        let assets = cell
-            .get_resource::<SpriteSheet>()
-            .expect("SpriteSheet not loaded");
-        let mut atlases = cell
-            .get_resource_mut::<Assets<TextureAtlas>>()
-            .expect("TextureAtlases missing");
-        MyTextureAtlas {
-            atlas: atlases.add(TextureAtlas::from_grid(
-                assets.female_adventurer.clone(),
-                Vec2::new(100., 96.),
-                8,
-                1,
-            )),
-        }
-    }
+    female_adventurer: Handle<TextureAtlas>,
 }
 
 fn draw_atlas(
     mut commands: Commands,
-    texture_atlas: Res<MyTextureAtlas>,
-    sprite_sheet: Res<SpriteSheet>,
+    my_assets: Res<MyAssets>,
+    texture_atlases: Res<Assets<TextureAtlas>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     // draw the original texture (whole atlas)
+    let atlas = texture_atlases
+        .get(my_assets.female_adventurer.clone())
+        .expect("Failed to find our atlas");
     commands.spawn_bundle(SpriteBundle {
-        material: materials.add(sprite_sheet.female_adventurer.clone().into()),
+        material: materials.add(atlas.texture.clone().into()),
         transform: Transform::from_xyz(0., -150., 0.),
         ..Default::default()
     });
@@ -69,7 +50,7 @@ fn draw_atlas(
                 ..Default::default()
             },
             sprite: TextureAtlasSprite::new(0),
-            texture_atlas: texture_atlas.atlas.clone(),
+            texture_atlas: my_assets.female_adventurer.clone(),
             ..Default::default()
         })
         .insert(Timer::from_seconds(0.1, true));
