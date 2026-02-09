@@ -519,8 +519,8 @@ pub(crate) enum InternalLoadingState<S: FreelyMutableState> {
 /// This resource is used for handles from asset collections and loading dynamic asset collection files.
 /// The generic will be the [`AssetCollection`] type for the first and the [`DynamicAssetCollection`] for the second.
 #[derive(Resource)]
-pub(crate) struct LoadingAssetHandles<T> {
-    handles: Vec<UntypedHandle>,
+pub struct LoadingAssetHandles<T> {
+    pub handles: Vec<UntypedHandle>,
     marker: PhantomData<T>,
 }
 
