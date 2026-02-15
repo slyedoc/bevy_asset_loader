@@ -212,7 +212,7 @@ impl DynamicAsset for StandardDynamicAsset {
                 let mut handle = asset_server.load(path);
                 Self::update_image_sampler(&mut handle, &mut images, sampler, address_mode);
                 if let Some(layers) = array_texture_layers {
-                    let image = images
+                    let mut image = images
                         .get_mut(&handle)
                         .expect("Failed to find loaded image");
                     let _ = image.reinterpret_stacked_2d_as_array(*layers);
@@ -298,7 +298,6 @@ impl StandardDynamicAsset {
         sampler_type: &ImageSamplerType,
         address_mode: &ImageAddressModeType,
     ) {
-        let image = images.get_mut(&*handle).unwrap();
         let configured_descriptor = ImageSamplerDescriptor {
             address_mode_u: address_mode.into(),
             address_mode_v: address_mode.into(),
@@ -308,17 +307,23 @@ impl StandardDynamicAsset {
             mipmap_filter: sampler_type.into(),
             ..Default::default()
         };
-        let is_different_sampler = if let ImageSampler::Descriptor(descriptor) = &image.sampler {
-            !descriptor.as_wgpu().eq(&configured_descriptor.as_wgpu())
-        } else {
-            false
+
+        let is_different_sampler = {
+            let image = images.get(&*handle).unwrap();
+            if let ImageSampler::Descriptor(descriptor) = &image.sampler {
+                !descriptor.as_wgpu().eq(&configured_descriptor.as_wgpu())
+            } else {
+                false
+            }
         };
 
         if is_different_sampler {
+            let image = images.get(&*handle).unwrap();
             let mut cloned_image = image.clone();
             cloned_image.sampler = ImageSampler::Descriptor(configured_descriptor);
             *handle = images.add(cloned_image);
         } else {
+            let mut image = images.get_mut(&*handle).unwrap();
             image.sampler = ImageSampler::Descriptor(configured_descriptor);
         }
     }
