@@ -24,7 +24,7 @@ pub(crate) fn load_dynamic_asset_collections<
     )>,
 ) {
     let (dynamic_asset_collections, asset_server, state, mut asset_loader_config) =
-        system_state.get_mut(world);
+        system_state.get_mut(world).expect("Failed to get system state");
     let mut loading_collections: LoadingAssetHandles<(S, C)> = LoadingAssetHandles::default();
 
     if let Some(files) = dynamic_asset_collections.get_files::<C>(state.get()) {
@@ -72,7 +72,7 @@ pub(crate) fn check_dynamic_asset_collections<
             dynamic_asset_collections,
             mut asset_keys,
             mut asset_loader_config,
-        ) = system_state.get_mut(world);
+        ) = system_state.get_mut(world).expect("Failed to get system state");
 
         if loading_collections.is_none() {
             return;

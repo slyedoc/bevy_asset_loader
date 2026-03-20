@@ -208,7 +208,7 @@ impl DynamicAsset for StandardDynamicAsset {
             } => {
                 let mut system_state =
                     SystemState::<(ResMut<Assets<Image>>, Res<AssetServer>)>::new(world);
-                let (mut images, asset_server) = system_state.get_mut(world);
+                let (mut images, asset_server) = system_state.get_mut(world).expect("Failed to get system state");
                 let mut handle = asset_server.load(path);
                 Self::update_image_sampler(&mut handle, &mut images, sampler, address_mode);
                 if let Some(layers) = array_texture_layers {
@@ -224,7 +224,7 @@ impl DynamicAsset for StandardDynamicAsset {
             StandardDynamicAsset::StandardMaterial { path } => {
                 let mut system_state =
                     SystemState::<(ResMut<Assets<StandardMaterial>>, Res<AssetServer>)>::new(world);
-                let (mut materials, asset_server) = system_state.get_mut(world);
+                let (mut materials, asset_server) = system_state.get_mut(world).expect("Failed to get system state");
                 let handle = materials
                     .add(StandardMaterial::from(
                         asset_server.get_handle::<Image>(path).unwrap(),
@@ -262,7 +262,7 @@ impl DynamicAsset for StandardDynamicAsset {
             StandardDynamicAsset::Folder { path } => {
                 let mut system_state =
                     SystemState::<(Res<Assets<LoadedFolder>>, Res<AssetServer>)>::new(world);
-                let (folders, asset_server) = system_state.get(world);
+                let (folders, asset_server) = system_state.get(world).expect("Failed to get system state");
                 Ok(DynamicAssetType::Collection(
                     folders
                         .get(&asset_server.get_handle(path).unwrap())

@@ -33,7 +33,7 @@ pub(crate) fn start_loading_collection<S: FreelyMutableState, Assets: AssetColle
         "Starting to load collection for type id {:?}",
         TypeId::of::<Assets>()
     );
-    let (mut asset_loader_configuration, state) = system_state.get_mut(world);
+    let (mut asset_loader_configuration, state) = system_state.get_mut(world).expect("Failed to get system state");
 
     let config = asset_loader_configuration
         .state_configurations
@@ -78,7 +78,7 @@ pub(crate) fn check_loading_collection<S: FreelyMutableState, Assets: AssetColle
         TypeId::of::<Assets>()
     );
     let (loading_asset_handles, state, asset_server, mut asset_loader_configuration) =
-        system_state.get_mut(world);
+        system_state.get_mut(world).expect("Failed to get system state");
 
     if let Some(loading_asset_handles) = loading_asset_handles {
         let (done, total) = count_loaded_handles::<S, Assets>(
