@@ -338,6 +338,8 @@ pub struct RegisterStandardDynamicAsset<K: Into<String> + Sync + Send + 'static>
 }
 
 impl<K: Into<String> + Sync + Send + 'static> Command for RegisterStandardDynamicAsset<K> {
+    type Out = ();
+
     fn apply(self, world: &mut World) {
         let mut dynamic_assets = world.resource_mut::<DynamicAssets>();
         dynamic_assets.register_asset(self.key, Box::new(self.asset));
