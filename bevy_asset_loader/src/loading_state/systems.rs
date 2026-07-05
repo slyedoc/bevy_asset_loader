@@ -8,6 +8,7 @@ use crate::loading_state::{
 use bevy_asset::AssetServer;
 use bevy_ecs::{
     change_detection::{Res, ResMut},
+    error::Result,
     resource::Resource,
     schedule::Schedules,
     system::SystemState,
@@ -28,12 +29,12 @@ pub(crate) fn finally_init_resource<Asset: Resource + FromWorld>(world: &mut Wor
 pub(crate) fn start_loading_collection<S: FreelyMutableState, Assets: AssetCollection>(
     world: &mut World,
     system_state: &mut SystemState<(ResMut<AssetLoaderConfiguration<S>>, Res<State<S>>)>,
-) {
+) -> Result {
     debug!(
         "Starting to load collection for type id {:?}",
         TypeId::of::<Assets>()
     );
-    let (mut asset_loader_configuration, state) = system_state.get_mut(world).expect("Failed to get system state");
+    let (mut asset_loader_configuration, state) = system_state.get_mut(world)?;
 
     let config = asset_loader_configuration
         .state_configurations
@@ -61,6 +62,8 @@ pub(crate) fn start_loading_collection<S: FreelyMutableState, Assets: AssetColle
     world.insert_resource(AssetCollectionsProgressId::<S, Assets>::new(
         ProgressEntryId::new(),
     ));
+
+    Ok(())
 }
 
 #[allow(clippy::type_complexity)]
@@ -72,13 +75,13 @@ pub(crate) fn check_loading_collection<S: FreelyMutableState, Assets: AssetColle
         Res<AssetServer>,
         ResMut<AssetLoaderConfiguration<S>>,
     )>,
-) {
+) -> Result {
     debug!(
         "Check loading of collection for type id {:?}",
         TypeId::of::<Assets>()
     );
     let (loading_asset_handles, state, asset_server, mut asset_loader_configuration) =
-        system_state.get_mut(world).expect("Failed to get system state");
+        system_state.get_mut(world)?;
 
     if let Some(loading_asset_handles) = loading_asset_handles {
         let (done, total) = count_loaded_handles::<S, Assets>(
@@ -100,6 +103,8 @@ pub(crate) fn check_loading_collection<S: FreelyMutableState, Assets: AssetColle
             world.remove_resource::<LoadingAssetHandles<Assets>>();
         }
     }
+
+    Ok(())
 }
 
 fn count_loaded_handles<S: FreelyMutableState, Assets: AssetCollection>(

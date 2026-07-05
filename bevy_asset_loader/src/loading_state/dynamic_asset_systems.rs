@@ -1,6 +1,7 @@
 use crate::dynamic_asset::{DynamicAssetCollection, DynamicAssetCollections, DynamicAssets};
 use crate::loading_state::{AssetLoaderConfiguration, InternalLoadingState, LoadingAssetHandles};
 use bevy_asset::{Asset, AssetServer, Assets, LoadState};
+use bevy_ecs::error::Result;
 use bevy_ecs::{
     change_detection::{Res, ResMut},
     system::SystemState,
@@ -22,9 +23,9 @@ pub(crate) fn load_dynamic_asset_collections<
         Res<State<S>>,
         ResMut<AssetLoaderConfiguration<S>>,
     )>,
-) {
+) -> Result {
     let (dynamic_asset_collections, asset_server, state, mut asset_loader_config) =
-        system_state.get_mut(world).expect("Failed to get system state");
+        system_state.get_mut(world)?;
     let mut loading_collections: LoadingAssetHandles<(S, C)> = LoadingAssetHandles::default();
 
     if let Some(files) = dynamic_asset_collections.get_files::<C>(state.get()) {
@@ -47,6 +48,8 @@ pub(crate) fn load_dynamic_asset_collections<
         }
     }
     world.insert_resource(loading_collections);
+
+    Ok(())
 }
 
 #[allow(clippy::type_complexity)]
@@ -63,7 +66,7 @@ pub(crate) fn check_dynamic_asset_collections<
         ResMut<DynamicAssets>,
         ResMut<AssetLoaderConfiguration<S>>,
     )>,
-) {
+) -> Result {
     {
         let (
             asset_server,
@@ -72,10 +75,10 @@ pub(crate) fn check_dynamic_asset_collections<
             dynamic_asset_collections,
             mut asset_keys,
             mut asset_loader_config,
-        ) = system_state.get_mut(world).expect("Failed to get system state");
+        ) = system_state.get_mut(world)?;
 
         if loading_collections.is_none() {
-            return;
+            return Ok(());
         }
         let config = asset_loader_config
             .state_configurations
@@ -90,10 +93,10 @@ pub(crate) fn check_dynamic_asset_collections<
                         config.loading_failed = true;
                         continue;
                     }
-                    _ => return,
+                    _ => return Ok(()),
                 }
             } else {
-                return;
+                return Ok(());
             }
         }
         for collection in loading_collections.handles.drain(..) {
@@ -106,6 +109,8 @@ pub(crate) fn check_dynamic_asset_collections<
             .remove(&TypeId::of::<C>());
     }
     world.remove_resource::<LoadingAssetHandles<(S, C)>>();
+
+    Ok(())
 }
 
 pub(crate) fn resume_to_loading_asset_collections<S: FreelyMutableState>(

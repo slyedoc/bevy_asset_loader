@@ -160,7 +160,7 @@ impl AssetField {
                         ResMut<::bevy::prelude::Assets<::bevy::prelude::Image>>,
                         Res<::bevy::prelude::AssetServer>,
                     )>::new(world);
-                    let (mut images, asset_server) = system_state.get_mut(world);
+                    let (mut images, asset_server) = system_state.get_mut(world).expect("Params should be valid");
 
                     let mut handle = asset_server.load(#asset_path);
                     let mut image = images.get_mut(&handle).expect("Only asset collection fields holding an `Image` handle can be annotated with `image`");
@@ -190,6 +190,7 @@ impl AssetField {
                         if is_different_sampler {
                             let mut cloned_image = image.clone();
                             cloned_image.sampler = ImageSampler::Descriptor(this_descriptor);
+                            drop(image);
                             handle = images.add(cloned_image);
                         } else {
                             image.sampler = ImageSampler::Default;
@@ -211,7 +212,7 @@ impl AssetField {
                                         Res<::bevy::asset::Assets<::bevy::asset::LoadedFolder>>,
                                         Res<::bevy::prelude::AssetServer>,
                                     )>::new(world);
-                                    let (folders, asset_server) = system_state.get(world);
+                                    let (folders, asset_server) = system_state.get(world).expect("Params should be valid");
                                     let handle = asset_server.get_handle(#asset_path).unwrap_or_else(|| panic!("Folders are only supported when using a loading state. Consider using 'paths' for {}.{}.", #name, #field));
                                     folders.get(&handle)
                                         .unwrap()
@@ -227,7 +228,7 @@ impl AssetField {
                                         Res<::bevy::asset::Assets<::bevy::asset::LoadedFolder>>,
                                         Res<::bevy::prelude::AssetServer>,
                                     )>::new(world);
-                                    let (folders, asset_server) = system_state.get(world);
+                                    let (folders, asset_server) = system_state.get(world).expect("Params should be valid");
                                     let mut folder_map = ::bevy::platform::collections::HashMap::default();
                                     let handle = asset_server.get_handle(#asset_path).unwrap_or_else(|| panic!("Folders are only supported when using a loading state. Consider using 'paths' for {}.{}.", #name, #field));
                                     let folder = &folders.get(&handle).unwrap().handles;
@@ -247,7 +248,7 @@ impl AssetField {
                                         Res<::bevy::asset::Assets<::bevy::asset::LoadedFolder>>,
                                         Res<::bevy::prelude::AssetServer>,
                                     )>::new(world);
-                                    let (folders, asset_server) = system_state.get(world);
+                                    let (folders, asset_server) = system_state.get(world).expect("Params should be valid");
                                     let handle = asset_server.get_handle(#asset_path).unwrap_or_else(|| panic!("Folders are only supported when using a loading state. Consider using 'paths' for {}.{}.", #name, #field));
                                     folders.get(&handle).expect("test").handles.iter().cloned().collect()
                                 },)
@@ -258,7 +259,7 @@ impl AssetField {
                                         Res<::bevy::asset::Assets<::bevy::asset::LoadedFolder>>,
                                         Res<::bevy::prelude::AssetServer>,
                                     )>::new(world);
-                                    let (folders, asset_server) = system_state.get(world);
+                                    let (folders, asset_server) = system_state.get(world).expect("Params should be valid");
                                     let mut folder_map = ::bevy::platform::collections::HashMap::default();
                                     let handle = asset_server.get_handle(#asset_path).unwrap_or_else(|| panic!("Folders are only supported when using a loading state. Consider using 'paths' for {}.{}.", #name, #field));
                                     let folder = &folders.get(&handle).unwrap().handles;
@@ -281,7 +282,7 @@ impl AssetField {
                         ResMut<::bevy::asset::Assets<::bevy::pbr::StandardMaterial>>,
                         Res<::bevy::prelude::AssetServer>,
                     )>::new(world);
-                    let (mut materials, asset_server) = system_state.get_mut(world);
+                    let (mut materials, asset_server) = system_state.get_mut(world).expect("Params should be valid");
                     materials.add(::bevy::pbr::StandardMaterial::from(asset_server.load::<::bevy::image::Image>(#asset_path)))
                 },)
             }
@@ -506,7 +507,7 @@ impl AssetField {
                             Res<::bevy_asset_loader::prelude::DynamicAssets>,
                         )>::new(world);
                         let (asset_server, asset_keys) =
-                            system_state.get(world);
+                            system_state.get(world).expect("Params should be valid");
                         let dynamic_asset = asset_keys.get_asset(#asset_key.into());
                         if let Some(dynamic_asset) = dynamic_asset {
                             handles.extend(dynamic_asset.load(&asset_server));
@@ -523,7 +524,7 @@ impl AssetField {
                             Res<::bevy_asset_loader::prelude::DynamicAssets>,
                         )>::new(world);
                         let (asset_server, asset_keys) =
-                            system_state.get(world);
+                            system_state.get(world).expect("Params should be valid");
                         let dynamic_asset = asset_keys.get_asset(#asset_key.into()).unwrap_or_else(|| panic!("Failed to get asset for key '{}'", #asset_key));
                         handles.extend(dynamic_asset.load(&asset_server));
                     }
@@ -644,13 +645,13 @@ impl AssetBuilder {
         if self.asset_path.is_some() && self.asset_paths.is_some() {
             return Err(vec![ParseFieldError::PathAndPathsAreExclusive]);
         }
-        if self.key.is_some() {
+        if let Some(key) = self.key {
             return if self.is_optional {
                 if self.is_collection {
                     Ok(AssetField::OptionalDynamicFileCollection(
                         DynamicAssetField {
                             field_ident: self.field_ident.unwrap(),
-                            key: self.key.unwrap(),
+                            key,
                         },
                         self.is_typed.into(),
                         self.is_mapped.into(),
@@ -658,14 +659,14 @@ impl AssetBuilder {
                 } else {
                     Ok(AssetField::OptionalDynamic(DynamicAssetField {
                         field_ident: self.field_ident.unwrap(),
-                        key: self.key.unwrap(),
+                        key,
                     }))
                 }
             } else if self.is_collection {
                 Ok(AssetField::DynamicFileCollection(
                     DynamicAssetField {
                         field_ident: self.field_ident.unwrap(),
-                        key: self.key.unwrap(),
+                        key,
                     },
                     self.is_typed.into(),
                     self.is_mapped.into(),
@@ -673,15 +674,15 @@ impl AssetBuilder {
             } else {
                 Ok(AssetField::Dynamic(DynamicAssetField {
                     field_ident: self.field_ident.unwrap(),
-                    key: self.key.unwrap(),
+                    key,
                 }))
             };
         }
-        if self.asset_paths.is_some() {
+        if let Some(asset_paths) = self.asset_paths {
             return Ok(AssetField::Files(
                 MultipleFilesField {
                     field_ident: self.field_ident.unwrap(),
-                    asset_paths: self.asset_paths.unwrap(),
+                    asset_paths,
                 },
                 self.is_typed.into(),
                 self.is_mapped.into(),

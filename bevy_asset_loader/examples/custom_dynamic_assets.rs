@@ -46,7 +46,7 @@ fn render_stuff(mut commands: Commands, assets: Res<MyAssets>) {
     ));
     commands.spawn(PointLight {
         intensity: 1500.0,
-        shadows_enabled: true,
+        shadow_maps_enabled: true,
         ..Default::default()
     });
 
@@ -102,12 +102,23 @@ impl DynamicAsset for CustomDynamicAsset {
                 top_layer,
                 bottom_layer,
             } => vec![
-                asset_server.load_untyped(bottom_layer).untyped(),
-                asset_server.load_untyped(top_layer).untyped(),
+                asset_server
+                    .load_builder()
+                    .load_untyped(bottom_layer)
+                    .untyped(),
+                asset_server
+                    .load_builder()
+                    .load_untyped(top_layer)
+                    .untyped(),
             ],
             CustomDynamicAsset::StandardMaterial {
                 base_color_texture, ..
-            } => vec![asset_server.load_untyped(base_color_texture).untyped()],
+            } => vec![
+                asset_server
+                    .load_builder()
+                    .load_untyped(base_color_texture)
+                    .untyped(),
+            ],
             CustomDynamicAsset::Cube { .. } => vec![],
         }
     }
@@ -122,7 +133,7 @@ impl DynamicAsset for CustomDynamicAsset {
             } => {
                 let mut system_state =
                     SystemState::<(ResMut<Assets<Image>>, Res<AssetServer>)>::new(world);
-                let (mut images, asset_server) = system_state.get_mut(world);
+                let (mut images, asset_server) = system_state.get_mut(world)?;
                 let first = images
                     .get(&asset_server.load(top_layer))
                     .expect("Failed to get first layer");
@@ -153,7 +164,7 @@ impl DynamicAsset for CustomDynamicAsset {
             } => {
                 let mut system_state =
                     SystemState::<(ResMut<Assets<StandardMaterial>>, Res<AssetServer>)>::new(world);
-                let (mut materials, asset_server) = system_state.get_mut(world);
+                let (mut materials, asset_server) = system_state.get_mut(world)?;
                 let color =
                     Color::linear_rgba(base_color[0], base_color[1], base_color[2], base_color[3]);
                 let image = asset_server.load(base_color_texture);

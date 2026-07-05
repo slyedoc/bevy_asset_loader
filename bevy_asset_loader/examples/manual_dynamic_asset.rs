@@ -216,12 +216,12 @@ fn text(bundle: impl Bundle, font_assets: &FontAssets) -> impl Bundle {
     (
         bundle,
         TextFont {
-            font: font_assets.fira_sans.clone(),
-            font_size: 30.0,
+            font: font_assets.fira_sans.clone().into(),
+            font_size: 30.0.into(),
             ..default()
         },
         TextColor(Color::linear_rgb(1., 1., 1.)),
-        TextLayout::new_with_justify(Justify::Center),
+        TextLayout::justify(Justify::Center),
     )
 }
 

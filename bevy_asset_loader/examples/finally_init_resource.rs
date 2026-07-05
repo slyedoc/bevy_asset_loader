@@ -38,7 +38,8 @@ struct CombinedImage {
 impl FromWorld for CombinedImage {
     fn from_world(world: &mut World) -> Self {
         let mut system_state = SystemState::<(ResMut<Assets<Image>>, Res<ImageAssets>)>::new(world);
-        let (mut images, image_assets) = system_state.get_mut(world);
+        let (mut images, image_assets) =
+            system_state.get_mut(world).expect("Params should be valid");
         let player_image = images.get(&image_assets.player).unwrap();
         let tree_image = images.get(&image_assets.tree).unwrap();
         let mut combined = player_image.clone();
