@@ -520,6 +520,7 @@ pub(crate) enum InternalLoadingState<S: FreelyMutableState> {
 /// The generic will be the [`AssetCollection`] type for the first and the [`DynamicAssetCollection`] for the second.
 #[derive(Resource)]
 pub struct LoadingAssetHandles<T> {
+    /// The handles of the assets that are loaded in the loading state. This is used to check whether all assets are loaded.
     pub handles: Vec<UntypedHandle>,
     marker: PhantomData<T>,
 }
